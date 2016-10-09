@@ -20,6 +20,25 @@ BATCH_MSG = "Epoch: %2d, Batch: %4d, Loss: %.4f, Dev-loss: %.4f: Dev-acc: %.4f"
 EPOCH_MSG = "\nEpoch: %2d, Loss: %.4f, Dev-loss: %.4f: Dev-acc: %.4f\n"
 
 
+def cumsum(freqs):
+    last = None
+    for k, v in sorted(freqs.items(), key=lambda x: x[0]):
+        if last:
+            cum[k] = cum[last] + v
+            last = k
+        else:
+            cum[k] = v
+            last = k
+
+
+def sample_weight(y, class_weight):
+    int_y = np.asarray([np.where(y_ == 1)[1] for y_ in y])
+    def weight_class(x):
+        return class_weight[x]
+    f = np.vectorize(weight_class)
+    return np.apply_along_axis(f, 1, int_y)
+
+
 def log_batch(epoch, batch, train_loss, dev_loss, dev_acc):
     print(BATCH_MSG % (epoch, batch, train_loss, dev_loss, dev_acc), end='\r')
 
@@ -37,10 +56,10 @@ def pos_hash(d):
     hash(frozenset(d)) % ((sys.maxsize + 1) * 2)
 
 
-def pos_counts(from_y, to_y):
+def pos_counts(from_y, to_y, **kwargs):
     tags = Counter()
     maxlen = 0
-    for sent in pos_from_range(from_y, to_y):
+    for sent in pos_from_range(from_y, to_y, **kwargs):
         for _, pos in sent:
             tags[pos] += 1
         maxlen = max(maxlen, len(sent))
@@ -76,6 +95,7 @@ if __name__ == '__main__':
     parser.add_argument('-y', '--years_range', nargs='+', type=int,
                         default=(1500, 1800))
     parser.add_argument('-s', '--seed', default=1001, type=int)
+    parser.add_argument('-m', '--maxsentlen', default=100, type=int)
     parser.add_argument('-o', '--optimizer', type=str, default='rmsprop')
     parser.add_argument('-r', '--rnn_layers', type=int, default=1)
     parser.add_argument('-l', '--lstm_dim', type=int, default=100)
@@ -92,6 +112,7 @@ if __name__ == '__main__':
 
     # params
     FROM_Y, TO_Y = args.years_range
+    MAXSENTLEN = args.maxsentlen
     OPTIMIZER = args.optimizer
     RNN_LAYERS = args.rnn_layers
     LSTM_DIM = args.lstm_dim
@@ -103,15 +124,16 @@ if __name__ == '__main__':
 
     # load tools
     ft = fasttext.load_model(args.fasttext_model)
-    maxlen, tags = pos_counts(FROM_Y, TO_Y)
+    maxlen, tags = pos_counts(FROM_Y, TO_Y, maxlen=MAXSENTLEN)
     total_counts = sum(tags.values())
     idxr = Indexer(pad='PAD', oov=None)
     idxr.fit(tags.keys())
     class_weight = {idxr.encode(t): c/total_counts for (t, c) in tags.items()}
+    class_weight.update({0: 0.0})
 
     print("Loading datasets")
     random.seed(SEED)
-    sents = pos_from_range(FROM_Y, TO_Y, shuffle=True)
+    sents = pos_from_range(FROM_Y, TO_Y, shuffle=True, maxlen=MAXSENTLEN)
     test = itertools.islice(sents, 1000)
     dev = itertools.islice(sents, 1000)
     X_test, y_test = list(zip(*[to_array(s, idxr, ft, maxlen) for s in test]))
@@ -123,7 +145,8 @@ if __name__ == '__main__':
     tagger = bilstm_tagger(ft, idxr.vocab_len(), maxlen,
                            lstm_dims=LSTM_DIM, hidden_dim=HIDDEN_DIM,
                            rnn_layers=RNN_LAYERS, dropout=DROPOUT)
-    tagger.compile(OPTIMIZER, loss='categorical_crossentropy', metrics=['accuracy'])
+    tagger.compile(OPTIMIZER, loss='categorical_crossentropy',
+                   sample_weight_mode='temporal', metrics=['accuracy'])
 
     # model params
     params = {'rnn_layers': RNN_LAYERS, 'lstm_layer': LSTM_DIM,
@@ -142,8 +165,8 @@ if __name__ == '__main__':
             losses = []
             bs = batches(sents, idxr, ft, maxlen, batch_size=BATCH_SIZE)
             for b, (X, y) in enumerate(bs):
-                loss, _ = tagger.train_on_batch(X, y#, class_weight=class_weight
-                )
+                loss, _ = tagger.train_on_batch(
+                    X, y, sample_weight=sample_weight(y, class_weight))
                 losses.append(loss)
                 if b % args.loss == 0:
                     dev_loss, dev_acc = tagger.test_on_batch(X_dev, y_dev)
@@ -162,3 +185,4 @@ if __name__ == '__main__':
     tagger.save_weights('./models/' + str(model_hash) + '_weights.h5')
     dump_json(tagger.get_config(), './models/' + str(model_hash) + '_config.json')
     idxr.save('./models/' + str(model_hash) + '_indexer.json')
+
