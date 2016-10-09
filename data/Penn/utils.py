@@ -1,15 +1,15 @@
 
 import sys
-
-try:
-    from .config import penn_root as root
-except:
-    raise Warning("set global variable ``penn_root'' to the appropriate value")
-
 import os
 import re
 import glob
 import random
+
+try:
+    from .config import penn_root
+    root = os.path.join(os.path.expanduser("~"), penn_root)
+except:
+    raise Warning("set global variable ``penn_root'' to the appropriate value")
 
 
 genre_mapping = {

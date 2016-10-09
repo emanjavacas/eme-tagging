@@ -1,1 +1,1 @@
-penn_root = "/home/enrique/corpora/PENN-CORPORA/"
+penn_root = "corpora/PENN-CORPORA/"
