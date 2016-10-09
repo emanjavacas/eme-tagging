@@ -1,7 +1,8 @@
 
 import re
+import itertools
 
-from .utils import take, INF, files_in_range, shuffle_seq
+from .utils import INF, files_in_range, shuffle_seq
 
 
 def simplify_tag(tag):
@@ -31,14 +32,17 @@ def pos_from_file(fname, rem_id=True, simple_tags=True):
             sent.append((word, tag))
 
 
-def pos_from_files(files, max_sents=INF, rem_id=True, shuffle=False):
-    sents = (sent for f in files for sent in pos_from_file(f, rem_id=rem_id))
+def pos_from_files(files, max_sents=INF, maxlen=INF, rem_id=True, shuffle=False):
+    sents = (sent for f in files for sent in pos_from_file(f, rem_id=rem_id)
+             if len(sent) < maxlen)
     if shuffle:
-        return take(shuffle_seq(sents), max_sents)
-    return take(sents, max_sents)
+        return itertools.islice(shuffle_seq(sents), max_sents)
+    return itertools.islice(sents, max_sents)
 
 
-def pos_from_range(from_y, to_y, max_sents=INF, rem_id=True, shuffle=False):
+def pos_from_range(from_y, to_y, max_sents=INF, maxlen=INF,
+                   rem_id=True, shuffle=False):
     files = files_in_range(from_y, to_y)
-    return pos_from_files(files, max_sents=max_sents, rem_id=rem_id, shuffle=shuffle)
+    return pos_from_files(files, max_sents=max_sents, maxlen=maxlen,
+                          rem_id=rem_id, shuffle=shuffle)
 

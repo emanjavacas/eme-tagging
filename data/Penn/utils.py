@@ -42,21 +42,12 @@ genre_mapping = {
     '"TRAVELOGUE"': '"DIARY"'
 }
 
-INF = float('inf')
+INF = sys.maxsize
 
 
 def intersection(*seqs):
     a, rest = list(seqs).pop(), seqs
     return [set(a) & set(s) for s in rest][0]
-
-
-def take(g, n):
-    index = 0
-    for x in g:
-        if index >= n:
-            break
-        yield x
-        index += 1
 
 
 def shuffle_seq(seq):
