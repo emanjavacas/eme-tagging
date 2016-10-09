@@ -48,11 +48,12 @@ def pos_counts(from_y, to_y):
 
 
 def to_array(sent, idxr, ft, maxlen):
+    zeros = np.zeros(ft.dim, dtype=np.float32)
     words, pos = zip(*sent)
-    words = pad(list(words), maxlen)
-    pos = pad(idxr.transform(pos), maxlen)
+    words = [ft[w] for w in words]
+    X = pad(list(words), maxlen, paditem=zeros)
+    pos = pad(idxr.transform(pos), maxlen, paditem=0)
     y = to_categorical(pos, nb_classes=idxr.vocab_len())
-    X = [ft[w] for w in words]
     return X, y
 
 
@@ -101,10 +102,12 @@ if __name__ == '__main__':
     SEED = args.seed
 
     # load tools
+    ft = fasttext.load_model(args.fasttext_model)
     maxlen, tags = pos_counts(FROM_Y, TO_Y)
+    total_counts = sum(tags.values())
     idxr = Indexer(pad='PAD', oov=None)
     idxr.fit(tags.keys())
-    ft = fasttext.load_model(args.fasttext_model)
+    class_weight = {idxr.encode(t): c/total_counts for (t, c) in tags.items()}
 
     print("Loading datasets")
     random.seed(SEED)
@@ -139,7 +142,8 @@ if __name__ == '__main__':
             losses = []
             bs = batches(sents, idxr, ft, maxlen, batch_size=BATCH_SIZE)
             for b, (X, y) in enumerate(bs):
-                loss, _ = tagger.train_on_batch(X, y)
+                loss, _ = tagger.train_on_batch(X, y#, class_weight=class_weight
+                )
                 losses.append(loss)
                 if b % args.loss == 0:
                     dev_loss, dev_acc = tagger.test_on_batch(X_dev, y_dev)
