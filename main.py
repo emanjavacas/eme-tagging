@@ -132,8 +132,9 @@ if __name__ == '__main__':
 
     random.seed(SEED)
     sents = pos_from_range(FROM_Y, TO_Y, shuffle=True, maxlen=MAXSENTLEN)
-    test = itertools.islice(sents, 1000)
-    dev = itertools.islice(sents, 1000)
+    test = list(itertools.islice(sents, 1000))
+    dev = list(itertools.islice(sents, 1000))
+    sents = list(sents) # store them in memory
     X_test, y_test = list(zip(*[to_array(s, idxr, ft, maxlen) for s in test]))
     X_test, y_test = np.asarray(X_test), np.asarray(y_test)
     X_dev, y_dev = list(zip(*[to_array(s, idxr, ft, maxlen) for s in dev]))
@@ -164,7 +165,8 @@ if __name__ == '__main__':
             bs = batches(sents, idxr, ft, maxlen, batch_size=BATCH_SIZE)
             for b, (X, y) in enumerate(bs):
                 loss, _ = tagger.train_on_batch(
-                    X, y, sample_weight=sample_weight(y, class_weight))
+                    X, y,
+                    sample_weight=sample_weight(y, class_weight))
                 losses.append(loss)
                 if b % args.loss == 0:
                     dev_loss, dev_acc = tagger.test_on_batch(
@@ -176,7 +178,9 @@ if __name__ == '__main__':
                 e, {'training_loss': str(np.mean(losses)),
                     'dev_loss': str(dev_loss),
                     'dev_acc': str(dev_acc)})
-        _, test_acc = tagger.test_on_batch(X_test, y_test)
+        _, test_acc = tagger.test_on_batch(
+            X_test, y_test,
+            sample_weight=sample_weight(y_test, class_weight))
         print("Test acc: %.4f\n" % test_acc)
         session.add_result({'test_acc': str(test_acc)})
         session.add_meta({'run_time': time() - start,
