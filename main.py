@@ -53,7 +53,7 @@ def dump_json(obj, fname):
 
 
 def pos_hash(d):    
-    hash(frozenset(d)) % ((sys.maxsize + 1) * 2)
+    return hash(frozenset(d)) % ((sys.maxsize + 1) * 2)
 
 
 def pos_counts(from_y, to_y, **kwargs):
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     parser.add_argument('-D', '--dropout', type=float, default=0.0)
     parser.add_argument('-f', '--fasttext_model', type=str,
                         default='data/fastText/tcp_full.bin')
-    parser.add_argument('-b', '--batch_size', type=int, default=50)
+    parser.add_argument('-b', '--batch_size', type=int, default=500)
     parser.add_argument('-e', '--epochs', type=int, default=10)
     parser.add_argument('-d', '--db', type=str, default='db.json')
     parser.add_argument('-L', '--loss', type=int, default=1,
@@ -120,7 +120,8 @@ if __name__ == '__main__':
     EPOCHS = args.epochs
     SEED = args.seed
 
-    # load tools
+    # load datasets and tools
+    print("Loading datasets")
     ft = fasttext.load_model(args.fasttext_model)
     maxlen, tags = pos_counts(FROM_Y, TO_Y, maxlen=MAXSENTLEN)
     total_counts = sum(tags.values())
@@ -129,7 +130,6 @@ if __name__ == '__main__':
     class_weight = {idxr.encode(t): c/total_counts for (t, c) in tags.items()}
     class_weight.update({0: 0.0})
 
-    print("Loading datasets")
     random.seed(SEED)
     sents = pos_from_range(FROM_Y, TO_Y, shuffle=True, maxlen=MAXSENTLEN)
     test = itertools.islice(sents, 1000)
@@ -167,7 +167,9 @@ if __name__ == '__main__':
                     X, y, sample_weight=sample_weight(y, class_weight))
                 losses.append(loss)
                 if b % args.loss == 0:
-                    dev_loss, dev_acc = tagger.test_on_batch(X_dev, y_dev)
+                    dev_loss, dev_acc = tagger.test_on_batch(
+                        X_dev, y_dev,
+                        sample_weight=sample_weight(y_dev, class_weight))
                     log_batch(e, b, np.mean(losses), dev_loss, dev_acc)
             log_epoch(e, np.mean(losses), dev_loss, dev_acc)                    
             session.add_epoch(
