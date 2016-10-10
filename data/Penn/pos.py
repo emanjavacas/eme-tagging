@@ -34,7 +34,7 @@ def pos_from_file(fname, rem_id=True, simple_tags=True):
 
 def pos_from_files(files, max_sents=INF, maxlen=INF, rem_id=True, shuffle=False):
     sents = (sent for f in files for sent in pos_from_file(f, rem_id=rem_id)
-             if len(sent) < maxlen)
+             if len(sent) <= maxlen)
     if shuffle:
         return itertools.islice(shuffle_seq(sents), max_sents)
     return itertools.islice(sents, max_sents)

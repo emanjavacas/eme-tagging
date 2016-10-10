@@ -43,7 +43,7 @@ def log_batch(epoch, batch, train_loss, dev_loss, dev_acc):
     print(BATCH_MSG % (epoch, batch, train_loss, dev_loss, dev_acc), end='\r')
 
 
-def log_epoch(epoch, train_loss, dev_loss):
+def log_epoch(epoch, train_loss, dev_loss, dev_acc):
     print(EPOCH_MSG % (epoch, train_loss, dev_loss, dev_acc))
 
 
@@ -99,7 +99,6 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--optimizer', type=str, default='rmsprop')
     parser.add_argument('-r', '--rnn_layers', type=int, default=1)
     parser.add_argument('-l', '--lstm_dim', type=int, default=100)
-    parser.add_argument('-H', '--hidden_dim', type=int, default=250)
     parser.add_argument('-D', '--dropout', type=float, default=0.0)
     parser.add_argument('-f', '--fasttext_model', type=str,
                         default='data/fastText/tcp_full.bin')
@@ -116,7 +115,6 @@ if __name__ == '__main__':
     OPTIMIZER = args.optimizer
     RNN_LAYERS = args.rnn_layers
     LSTM_DIM = args.lstm_dim
-    HIDDEN_DIM = args.hidden_dim
     DROPOUT = args.dropout
     BATCH_SIZE = args.batch_size
     EPOCHS = args.epochs
@@ -142,18 +140,18 @@ if __name__ == '__main__':
     X_dev, y_dev = np.asarray(X_dev), np.asarray(y_dev)
 
     print("Compiling model")
-    tagger = bilstm_tagger(ft, idxr.vocab_len(), maxlen,
-                           lstm_dims=LSTM_DIM, hidden_dim=HIDDEN_DIM,
+    tagger = bilstm_tagger(ft, idxr.vocab_len(), maxlen, lstm_dims=LSTM_DIM, 
                            rnn_layers=RNN_LAYERS, dropout=DROPOUT)
     tagger.compile(OPTIMIZER, loss='categorical_crossentropy',
                    sample_weight_mode='temporal', metrics=['accuracy'])
+    tagger.summary()
 
     # model params
     params = {'rnn_layers': RNN_LAYERS, 'lstm_layer': LSTM_DIM,
-              'hidden_layer': HIDDEN_DIM, 'optimizer': OPTIMIZER,
-              'batch_size': BATCH_SIZE, 'dropout': DROPOUT,
-              'pos_tags': list(tags.keys()), 'ft_model': args.fasttext_model,
-              'range': [FROM_Y, TO_Y], 'seed': SEED}
+              'optimizer': OPTIMIZER, 'batch_size': BATCH_SIZE,
+              'dropout': DROPOUT, 'pos_tags': list(tags.keys()),
+              'ft_model': args.fasttext_model, 'range': [FROM_Y, TO_Y],
+              'seed': SEED}
     model_hash = pos_hash(params)
 
     print("Training")
